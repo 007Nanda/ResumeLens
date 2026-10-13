@@ -1,0 +1,11 @@
+# Web framework
+fastapi
+
+# ASGI server used to run the app in development
+uvicorn
+
+# Required by fastapi.testclient.TestClient used in tests
+httpx
+
+# Test runner
+pytest
