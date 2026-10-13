@@ -1,0 +1,5 @@
+# Ignore every uploaded resume file placed in this directory.
+# The negation keeps this guard itself tracked, so the protection cannot be
+# lost by accident even if the directory is copied or moved.
+*
+!.gitignore

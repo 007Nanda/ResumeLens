@@ -22,4 +22,11 @@ build/
 Thumbs.db
 
 # Local uploaded files
-uploads/
+# Anchored to the repository root on purpose. An unanchored "uploads/" also
+# matches backend/uploads/, and because git cannot re-include a file whose
+# parent directory is excluded, that would silently drop the guard file below.
+/uploads/
+
+# Resume upload storage: ignore stored files but keep the guard file tracked.
+/backend/uploads/*
+!/backend/uploads/.gitignore

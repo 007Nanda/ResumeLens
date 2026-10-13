@@ -1,6 +1,12 @@
 # Web framework
 fastapi
 
+# Required by FastAPI for multipart/form-data file uploads
+# 0.0.31 is the floor: it fixes GHSA-v9pg-7xvm-68hf (negative Content-Length
+# buffers the whole body in memory), plus earlier DoS and parameter-smuggling
+# advisories. Do not lower this bound.
+python-multipart>=0.0.31
+
 # ASGI server used to run the app in development
 uvicorn
 

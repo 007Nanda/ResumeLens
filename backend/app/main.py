@@ -2,11 +2,15 @@
 
 from fastapi import FastAPI
 
+from app.api.resumes import router as resumes_router
+
 app = FastAPI(
     title="ResumeLens API",
     description="Backend API for analyzing resumes for ATS readiness.",
     version="0.1.0",
 )
+
+app.include_router(resumes_router)
 
 
 @app.get("/health", tags=["health"])
