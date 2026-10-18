@@ -8,10 +8,13 @@ safe to run on a developer's machine.
 import io
 import zipfile
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Sequence
 
 import pytest
+from docx import Document
 from fastapi.testclient import TestClient
+from pypdf import PageObject, PdfWriter
+from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 from app.config import DEFAULT_MAX_UPLOAD_BYTES, Settings, get_settings
 from app.main import app
@@ -89,6 +92,92 @@ def make_docx_bytes() -> Callable[..., bytes]:
             archive.writestr("[Content_Types].xml", _CONTENT_TYPES_XML)
             if include_document:
                 archive.writestr("word/document.xml", _DOCUMENT_XML)
+        return buffer.getvalue()
+
+    return _make
+
+
+def _add_pdf_text(writer: PdfWriter, page: PageObject, text: str) -> None:
+    """Draw a single line of text near the top of a blank PDF page.
+
+    pypdf's writer has no public API for attaching a content stream, so this
+    helper uses the private ``_add_object`` call that pypdf's own test suite
+    uses. Should that ever change, the fixtures fail loudly instead of quietly
+    producing PDFs without text.
+    """
+    font = writer._add_object(
+        DictionaryObject(
+            {
+                NameObject("/Type"): NameObject("/Font"),
+                NameObject("/Subtype"): NameObject("/Type1"),
+                NameObject("/BaseFont"): NameObject("/Helvetica"),
+            }
+        )
+    )
+    page[NameObject("/Resources")] = DictionaryObject(
+        {NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})}
+    )
+    escaped = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+    content = DecodedStreamObject()
+    content.set_data(f"BT /F1 12 Tf 72 720 Td ({escaped}) Tj ET".encode("latin-1"))
+    page[NameObject("/Contents")] = writer._add_object(content)
+
+
+@pytest.fixture
+def make_text_pdf_bytes() -> Callable[..., bytes]:
+    """Build a real PDF that pypdf can read back, with known page text.
+
+    ``pages`` controls the page count: each entry is the text of one page,
+    and an empty entry produces a page with no text at all. Pass ``password``
+    to produce an encrypted PDF; ``password=""`` reproduces the common
+    "encrypted with an empty user password" shape.
+    """
+
+    def _make(
+        pages: Sequence[str] = ("Alice Example",),
+        *,
+        password: str | None = None,
+    ) -> bytes:
+        writer = PdfWriter()
+        for page_text in pages:
+            page = writer.add_blank_page(width=612, height=792)
+            if page_text:
+                _add_pdf_text(writer, page, page_text)
+        if password is not None:
+            writer.encrypt(password)
+        buffer = io.BytesIO()
+        writer.write(buffer)
+        return buffer.getvalue()
+
+    return _make
+
+
+@pytest.fixture
+def make_text_docx_bytes() -> Callable[..., bytes]:
+    """Build a real DOCX with known body content in document order.
+
+    Each block is either a paragraph (a plain string) or a table (a non-empty
+    list of rows, each row a list of cell values). Calling the fixture with no
+    blocks returns an empty but valid document.
+    """
+
+    def _make(
+        blocks: Sequence[str | Sequence[Sequence[str]]] = (),
+    ) -> bytes:
+        document = Document()
+        for block in blocks:
+            if isinstance(block, str):
+                document.add_paragraph(block)
+                continue
+            rows = [list(row) for row in block]
+            table = document.add_table(
+                rows=len(rows), cols=max(len(row) for row in rows)
+            )
+            for table_row, values in zip(table.rows, rows):
+                for cell, value in zip(table_row.cells, values):
+                    cell.text = value
+        buffer = io.BytesIO()
+        document.save(buffer)
         return buffer.getvalue()
 
     return _make

@@ -10,6 +10,12 @@ python-multipart>=0.0.31
 # ASGI server used to run the app in development
 uvicorn
 
+# Resume text extraction: reads the text layer of PDF files
+pypdf
+
+# Resume text extraction: reads paragraphs and tables from DOCX files
+python-docx
+
 # Required by fastapi.testclient.TestClient used in tests
 httpx
 
